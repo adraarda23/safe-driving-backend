@@ -1,12 +1,17 @@
 require('dotenv').config();
+const http = require('http');
 
 const { createApp } = require('./app');
 const { createDb } = require('./db');
+const { attachSocketServer } = require('./realtime');
 
 const db = createDb(process.env.SQLITE_PATH || './data/app.db');
-const app = createApp(db);
-const port = Number(process.env.PORT || 3000);
+const server = http.createServer();
+const { emit } = attachSocketServer(server);
+const app = createApp(db, emit);
+server.on('request', app);
 
-app.listen(port, () => {
+const port = Number(process.env.PORT || 3000);
+server.listen(port, () => {
   console.log(`Server listening on http://localhost:${port}`);
 });

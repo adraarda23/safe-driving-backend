@@ -1,5 +1,6 @@
 const express = require('express');
 const { authMiddleware } = require('../auth');
+const { analyzeBatch } = require('../analysis');
 
 function checkDeviceAccess(db, user, deviceId) {
   const device = db.prepare('SELECT id, user_id FROM devices WHERE id = ?').get(deviceId);
@@ -10,17 +11,27 @@ function checkDeviceAccess(db, user, deviceId) {
   return { device };
 }
 
-module.exports = (db) => {
+module.exports = (db, emit) => {
   const router = express.Router();
   router.use(authMiddleware);
 
   const insertSample = db.prepare(
     'INSERT INTO sensor_samples (device_id, ts, sensor_type, payload) VALUES (?, ?, ?, ?)'
   );
-  const insertBatch = db.transaction((deviceId, samples) => {
+  const insertAlarm = db.prepare(
+    'INSERT INTO alarms (device_id, ts, kind, severity, details) VALUES (?, ?, ?, ?, ?)'
+  );
+  const ingest = db.transaction((deviceId, samples) => {
     for (const s of samples) {
       insertSample.run(deviceId, s.ts, s.sensorType, JSON.stringify(s.payload));
     }
+    const alarms = analyzeBatch(samples);
+    const saved = [];
+    for (const a of alarms) {
+      const r = insertAlarm.run(deviceId, a.ts, a.kind, a.severity, JSON.stringify(a.details));
+      saved.push({ id: r.lastInsertRowid, deviceId, ...a });
+    }
+    return saved;
   });
 
   router.post('/', (req, res) => {
@@ -36,8 +47,11 @@ module.exports = (db) => {
     const access = checkDeviceAccess(db, req.user, deviceId);
     if (access.error) return res.status(access.status).json({ error: access.error });
 
-    insertBatch(deviceId, samples);
-    return res.status(201).json({ count: samples.length });
+    const alarms = ingest(deviceId, samples);
+    for (const a of alarms) {
+      emit('alarm:new', a, [`user:${access.device.user_id}`, 'admins']);
+    }
+    return res.status(201).json({ count: samples.length, alarms: alarms.length });
   });
 
   router.get('/', (req, res) => {
@@ -57,7 +71,6 @@ module.exports = (db) => {
       .prepare(`SELECT id, device_id AS deviceId, ts, sensor_type AS sensorType, payload
                 FROM sensor_samples WHERE ${clauses.join(' AND ')} ORDER BY ts`)
       .all(...params);
-
     return res.json(rows.map((r) => ({ ...r, payload: JSON.parse(r.payload) })));
   });
 
