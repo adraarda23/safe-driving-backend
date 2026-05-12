@@ -41,6 +41,8 @@ The SQLite database file is created automatically at `./data/app.db` on first st
 
 Open <http://localhost:3000/docs> for the interactive API documentation.
 
+**Integrating with this API?** See [`docs/INTEGRATION.md`](docs/INTEGRATION.md) — a step-by-step guide for mobile and dashboard teams.
+
 ## Environment variables (`.env`)
 
 | Variable | Default | Purpose |
