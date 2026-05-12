@@ -1,5 +1,6 @@
 const express = require('express');
 const authRoutes = require('./routes/auth');
+const deviceRoutes = require('./routes/devices');
 
 function createApp(db) {
   const app = express();
@@ -7,6 +8,7 @@ function createApp(db) {
 
   app.get('/health', (req, res) => res.json({ ok: true }));
   app.use('/auth', authRoutes(db));
+  app.use('/devices', deviceRoutes(db));
 
   return app;
 }
