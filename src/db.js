@@ -26,6 +26,16 @@ function initSchema(db) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_devices_user ON devices(user_id);
+
+    CREATE TABLE IF NOT EXISTS sensor_samples (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+      ts TEXT NOT NULL,
+      sensor_type TEXT NOT NULL,
+      payload TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_samples_device_ts ON sensor_samples(device_id, ts);
   `);
 }
 
